@@ -1,0 +1,61 @@
+trigger:
+  branches:
+    include:
+      - master
+
+variables:
+  azureSubscription: 'Azure-Timo-ServiceConnection'
+  webAppName: 'app-timo-api'
+  buildConfiguration: 'Release'
+
+stages:
+- stage: Build
+  displayName: 'Build React and .NET'
+  jobs:
+  - job: Build
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    # 1. Install Node.js for the frontend publish target
+    - task: NodeTool@0
+      displayName: 'Install Node.js'
+      inputs:
+        versionSpec: '22.x'
+
+    # 2. Install .NET 10 & Publish the API with the frontend
+    - task: UseDotNet@2
+      displayName: 'Install .NET 10 SDK'
+      inputs:
+        packageType: 'sdk'
+        version: '10.x'
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Build and Publish .NET API'
+      inputs:
+        command: 'publish'
+        publishWebProjects: false
+        projects: '$(Build.SourcesDirectory)/backend/Timo.WebApi/Timo.WebApi.csproj'
+        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+        zipAfterPublish: true
+
+    - publish: '$(Build.ArtifactStagingDirectory)'
+      artifact: drop
+
+- stage: Deploy
+  displayName: 'Deploy Unified App'
+  dependsOn: Build
+  jobs:
+  - job: Deploy
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - download: current
+      artifact: drop
+
+    - task: AzureWebApp@1
+      displayName: 'Deploy to Azure App Service'
+      inputs:
+        azureSubscription: '$(azureSubscription)'
+        appType: 'webAppLinux'
+        appName: '$(webAppName)'
+        package: '$(Pipeline.Workspace)/drop/*.zip'

@@ -19,11 +19,32 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="9.0.21" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.3.1" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Timo.Infrastructure\Timo.Infrastructure.csproj" />
   </ItemGroup>
+
+  <Target Name="BuildFrontend" BeforeTargets="Publish">
+    <PropertyGroup>
+      <FrontendDirectory>$(MSBuildProjectDirectory)\..\..\frontend</FrontendDirectory>
+    </PropertyGroup>
+
+    <Exec Command="npm ci" WorkingDirectory="$(FrontendDirectory)" />
+    <Exec Command="npm run build" WorkingDirectory="$(FrontendDirectory)" />
+
+    <ItemGroup>
+      <FrontendPublishAsset Include="$(FrontendDirectory)\dist\**\*" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="CopyFrontendToPublish" AfterTargets="Publish">
+    <Copy
+      SourceFiles="@(FrontendPublishAsset)"
+      DestinationFiles="@(FrontendPublishAsset->'$(PublishDir)\wwwroot\%(RecursiveDir)%(Filename)%(Extension)')"
+      SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>

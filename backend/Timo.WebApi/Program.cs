@@ -88,9 +88,37 @@ namespace Timo.WebApi
                 app.UseHttpsRedirection();
             }
 
+            var spaIndexPath = app.Environment.WebRootPath is { } webRootPath
+                ? Path.Combine(webRootPath, "index.html")
+                : null;
+            if (spaIndexPath is not null && File.Exists(spaIndexPath))
+            {
+                app.UseDefaultFiles();
+                app.UseStaticFiles();
+            }
+
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();
+            app.MapFallback(async context =>
+            {
+                if (context.Request.Path.StartsWithSegments("/api"))
+                {
+                    context.Response.StatusCode = StatusCodes.Status404NotFound;
+                    return;
+                }
+
+                if (spaIndexPath is null || !File.Exists(spaIndexPath))
+                {
+                    context.Response.StatusCode = StatusCodes.Status404NotFound;
+                    await context.Response.WriteAsync(
+                        "Frontend assets are not built. Run the Vite development server from the frontend directory.");
+                    return;
+                }
+
+                context.Response.ContentType = "text/html";
+                await context.Response.SendFileAsync(spaIndexPath);
+            });
 
             await app.RunAsync();
         }
