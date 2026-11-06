@@ -1,0 +1,6 @@
+@Timo.WebApi_HostAddress = http://localhost:5246
+
+GET {{Timo.WebApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
