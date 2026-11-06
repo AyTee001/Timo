@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Toaster } from './components/ui/sonner';
 import { AuthPage } from './components/AuthPage';
+import { LandingPage } from './components/LandingPage';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { Dashboard } from './pages/Dashboard';
@@ -12,6 +13,7 @@ import { toast } from 'sonner';
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+  const [authMode, setAuthMode] = useState<'login' | 'register' | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -86,6 +88,7 @@ export default function App() {
     try {
       await authApi.logout();
       setUser(null);
+      setAuthMode(null);
       setProjects([]);
       setProjectsError('');
       setTimeEntries([]);
@@ -154,7 +157,18 @@ export default function App() {
   }
 
   if (!user) {
-    return <AuthPage onAuthenticated={handleAuthenticated} />;
+    return authMode ? (
+      <AuthPage
+        initialMode={authMode}
+        onAuthenticated={handleAuthenticated}
+        onBack={() => setAuthMode(null)}
+      />
+    ) : (
+      <LandingPage
+        onLogin={() => setAuthMode('login')}
+        onRegister={() => setAuthMode('register')}
+      />
+    );
   }
 
   return (
