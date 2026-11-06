@@ -17,7 +17,7 @@ public sealed class ProjectsController(ProjectService projectService) : Controll
     [ProducesResponseType(typeof(IReadOnlyList<ProjectResponse>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<ProjectResponse>>> GetAll(CancellationToken cancellationToken)
     {
-        var projects = await projectService.GetAllAsync(GetCurrentUserId(), cancellationToken);
+        var projects = await projectService.GetAllAsync(cancellationToken);
         return Ok(projects.Select(ToResponse).ToArray());
     }
 
@@ -28,7 +28,7 @@ public sealed class ProjectsController(ProjectService projectService) : Controll
     {
         try
         {
-            return Ok(ToResponse(await projectService.GetByIdAsync(id, GetCurrentUserId(), cancellationToken)));
+            return Ok(ToResponse(await projectService.GetByIdAsync(id, cancellationToken)));
         }
         catch (ProjectNotFoundException)
         {
@@ -84,7 +84,7 @@ public sealed class ProjectsController(ProjectService projectService) : Controll
     {
         try
         {
-            var project = await projectService.UpdateAsync(id, GetCurrentUserId(), request, cancellationToken);
+            var project = await projectService.UpdateAsync(id, request, cancellationToken);
             return Ok(ToResponse(project));
         }
         catch (ProjectNotFoundException)
@@ -119,7 +119,7 @@ public sealed class ProjectsController(ProjectService projectService) : Controll
     {
         try
         {
-            await projectService.DeleteAsync(id, GetCurrentUserId(), cancellationToken);
+            await projectService.DeleteAsync(id, cancellationToken);
             return NoContent();
         }
         catch (ProjectNotFoundException)

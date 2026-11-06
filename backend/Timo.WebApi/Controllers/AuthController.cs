@@ -1,8 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Antiforgery;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -10,6 +8,7 @@ using Microsoft.AspNetCore.WebUtilities;
 using Timo.Infrastructure.Entities;
 using Timo.Infrastructure.Repositories;
 using Timo.WebApi.DTOs;
+using Timo.WebApi.Services;
 
 namespace Timo.WebApi.Controllers;
 
@@ -20,8 +19,12 @@ public sealed class AuthController(
     UserManager<ApplicationUser> userManager,
     SignInManager<ApplicationUser> signInManager,
     RefreshTokenRepository refreshTokenRepository,
-    IAntiforgery antiforgery) : ControllerBase
+    IAntiforgery antiforgery,
+    JwtTokenService jwtTokenService,
+    IConfiguration configuration,
+    IWebHostEnvironment environment) : ControllerBase
 {
+    private const string AccessCookieName = "timo.auth";
     private const string RefreshCookieName = "timo.refresh";
     private static readonly TimeSpan AccessTokenLifetime = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan RefreshTokenLifetime = TimeSpan.FromDays(14);
@@ -137,7 +140,7 @@ public sealed class AuthController(
             await refreshTokenRepository.RevokeAsync(HashToken(refreshToken), DateTime.UtcNow, cancellationToken);
         }
 
-        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        Response.Cookies.Delete(AccessCookieName, AccessCookieOptions());
         Response.Cookies.Delete(RefreshCookieName, RefreshCookieOptions());
         return NoContent();
     }
@@ -181,15 +184,12 @@ public sealed class AuthController(
     private async Task IssueSessionCookiesAsync(ApplicationUser user, string refreshToken, DateTime now)
     {
         var principal = await signInManager.CreateUserPrincipalAsync(user);
-        await HttpContext.SignInAsync(
-            CookieAuthenticationDefaults.AuthenticationScheme,
-            principal,
-            new AuthenticationProperties
-            {
-                ExpiresUtc = now.Add(AccessTokenLifetime),
-                IsPersistent = true,
-                AllowRefresh = false
-            });
+        var accessToken = jwtTokenService.CreateAccessToken(principal, now, AccessTokenLifetime);
+
+        Response.Cookies.Append(
+            AccessCookieName,
+            accessToken,
+            AccessCookieOptions(now.Add(AccessTokenLifetime)));
 
         Response.Cookies.Append(
             RefreshCookieName,
@@ -197,14 +197,27 @@ public sealed class AuthController(
             RefreshCookieOptions(now.Add(RefreshTokenLifetime)));
     }
 
+    private CookieOptions AccessCookieOptions(DateTime? expiresUtc = null) => new()
+    {
+        HttpOnly = true,
+        Secure = UseSecureCookies,
+        SameSite = SameSiteMode.Strict,
+        Path = "/api",
+        Expires = expiresUtc
+    };
+
     private CookieOptions RefreshCookieOptions(DateTime? expiresUtc = null) => new()
     {
         HttpOnly = true,
-        Secure = Request.IsHttps,
+        Secure = UseSecureCookies,
         SameSite = SameSiteMode.Strict,
         Path = "/api/auth",
         Expires = expiresUtc
     };
+
+    private bool UseSecureCookies =>
+        Request.IsHttps ||
+        (configuration.GetValue<bool?>("Authentication:RequireHttps") ?? !environment.IsDevelopment());
 
     private static string CreateRefreshToken() =>
         WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(64));

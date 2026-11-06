@@ -6,15 +6,29 @@ import { TimeEntryDialog } from '../components/TimeEntryDialog';
 import { DeleteConfirmDialog } from '../components/DeleteConfirmDialog';
 import type { Project, TimeEntry, TimeEntryInput } from '../types';
 import { formatDuration, formatDate } from '../data/mockData';
+import { toast } from 'sonner';
 
 interface TimeEntriesProps {
   timeEntries: TimeEntry[];
   projects: Project[];
-  onSave: (data: TimeEntryInput, entryId?: string) => void;
-  onDelete: (id: string) => void;
+  onSave: (data: TimeEntryInput, entryId?: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  isLoading: boolean;
+  loadError: string;
+  onRetry: () => void;
+  onNavigateToProjects: () => void;
 }
 
-export function TimeEntries({ timeEntries, projects, onSave, onDelete }: TimeEntriesProps) {
+export function TimeEntries({
+  timeEntries,
+  projects,
+  onSave,
+  onDelete,
+  isLoading,
+  loadError,
+  onRetry,
+  onNavigateToProjects,
+}: TimeEntriesProps) {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<TimeEntry | undefined>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<TimeEntry | null>(null);
@@ -38,7 +52,12 @@ export function TimeEntries({ timeEntries, projects, onSave, onDelete }: TimeEnt
           <h1 id="time-entries-heading" className="text-2xl font-bold text-foreground">Мої записи часу</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">Керуйте своїми записами робочого часу.</p>
         </div>
-        <Button size="sm" className="cursor-pointer shrink-0 gap-1.5 self-start" onClick={openCreate}>
+        <Button
+          size="sm"
+          className="cursor-pointer shrink-0 gap-1.5 self-start"
+          onClick={openCreate}
+          disabled={projects.length === 0}
+        >
           <Plus className="h-4 w-4" aria-hidden="true" />
           Новий запис
         </Button>
@@ -47,12 +66,32 @@ export function TimeEntries({ timeEntries, projects, onSave, onDelete }: TimeEnt
       <section aria-labelledby="entries-table-heading">
         <h2 id="entries-table-heading" className="sr-only">Список записів часу</h2>
         <Card>
-          {sorted.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
-              <p className="text-sm">Записів ще немає.</p>
-              <Button size="sm" variant="outline" className="cursor-pointer" onClick={openCreate}>
-                Додати перший запис
+          {isLoading ? (
+            <p className="py-16 text-center text-sm text-muted-foreground" role="status">Завантаження записів…</p>
+          ) : loadError ? (
+            <div className="flex flex-col items-center gap-3 py-16">
+              <p className="text-sm text-red-700" role="alert">{loadError}</p>
+              <Button size="sm" variant="outline" className="cursor-pointer" onClick={onRetry}>
+                Спробувати ще раз
               </Button>
+            </div>
+          ) : sorted.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
+              {projects.length === 0 ? (
+                <>
+                  <p className="text-sm">Спочатку створіть проєкт, щоб додати запис часу.</p>
+                  <Button size="sm" variant="outline" className="cursor-pointer" onClick={onNavigateToProjects}>
+                    Перейти до проєктів
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm">Записів ще немає.</p>
+                  <Button size="sm" variant="outline" className="cursor-pointer" onClick={openCreate}>
+                    Додати перший запис
+                  </Button>
+                </>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -125,9 +164,14 @@ export function TimeEntries({ timeEntries, projects, onSave, onDelete }: TimeEnt
           : ''}
         itemNoun="Запис"
         confirmLabel="Видалити запис"
-        onConfirm={() => {
-          if (deleteTarget) onDelete(deleteTarget.id);
-          setDeleteTarget(null);
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          try {
+            await onDelete(deleteTarget.id);
+            setDeleteTarget(null);
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Не вдалося видалити запис.');
+          }
         }}
       />
     </main>

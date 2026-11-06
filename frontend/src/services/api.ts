@@ -1,4 +1,4 @@
-import type { Project, ProjectFormData } from '../types';
+import type { Project, ProjectFormData, TimeEntry, TimeEntryInput } from '../types';
 
 interface ApiErrorBody {
   title?: string;
@@ -23,6 +23,8 @@ export interface AuthenticatedUser {
   email: string;
 }
 
+let refreshInProgress: Promise<boolean> | null = null;
+
 async function getCsrfToken(): Promise<string> {
   const response = await fetch('/api/auth/csrf', { credentials: 'include' });
   if (!response.ok) throw new ApiError('Не вдалося отримати токен захисту запиту.', response.status);
@@ -44,11 +46,22 @@ async function send(path: string, init: RequestInit = {}): Promise<Response> {
 async function sendWithRefresh(path: string, init: RequestInit = {}): Promise<Response> {
   let response = await send(path, init);
   const isAuthEndpoint = path.startsWith('/api/auth/') && path !== '/api/auth/me';
-  if (response.status === 401 && !isAuthEndpoint) {
-    const refreshed = await send('/api/auth/refresh', { method: 'POST' });
-    if (refreshed.ok) response = await send(path, init);
+  if (response.status === 401 && !isAuthEndpoint && await refreshSession()) {
+    response = await send(path, init);
   }
   return response;
+}
+
+function refreshSession(): Promise<boolean> {
+  if (!refreshInProgress) {
+    refreshInProgress = send('/api/auth/refresh', { method: 'POST' })
+      .then((response) => response.ok)
+      .finally(() => {
+        refreshInProgress = null;
+      });
+  }
+
+  return refreshInProgress;
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -113,6 +126,25 @@ export const projectsApi = {
     request<void>(`/api/projects/${id}`, { method: 'DELETE' }),
 };
 
+export const timeEntriesApi = {
+  list: async () => (await request<TimeEntryResponse[]>('/api/time-entries')).map(toTimeEntry),
+
+  create: (data: TimeEntryInput) =>
+    request<TimeEntryResponse>('/api/time-entries', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }).then(toTimeEntry),
+
+  update: (id: string, data: TimeEntryInput) =>
+    request<TimeEntryResponse>(`/api/time-entries/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }).then(toTimeEntry),
+
+  delete: (id: string) =>
+    request<void>(`/api/time-entries/${id}`, { method: 'DELETE' }),
+};
+
 interface ProjectResponse {
   id: string;
   name: string;
@@ -121,6 +153,14 @@ interface ProjectResponse {
   timeEntriesCount: number;
 }
 
+interface TimeEntryResponse extends Omit<TimeEntry, 'description'> {
+  description: string | null;
+}
+
 function toProject(project: ProjectResponse): Project {
   return { ...project, description: project.description ?? '' };
+}
+
+function toTimeEntry(entry: TimeEntryResponse): TimeEntry {
+  return { ...entry, description: entry.description ?? '' };
 }

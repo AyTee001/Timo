@@ -4,8 +4,12 @@ using Timo.Infrastructure.Entities;
 
 namespace Timo.Infrastructure;
 
-public class TimoDbContext(DbContextOptions<TimoDbContext> options) : IdentityUserContext<ApplicationUser, Guid>(options)
+public class TimoDbContext(
+    DbContextOptions<TimoDbContext> options,
+    ICurrentUser currentUser) : IdentityUserContext<ApplicationUser, Guid>(options)
 {
+    public Guid CurrentUserId => currentUser.UserId;
+
     public DbSet<Project> Projects => Set<Project>();
     public DbSet<TimeEntry> TimeEntries => Set<TimeEntry>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
@@ -31,6 +35,7 @@ public class TimoDbContext(DbContextOptions<TimoDbContext> options) : IdentityUs
                   .WithMany(u => u.Projects)
                   .HasForeignKey(e => e.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
+            entity.HasQueryFilter(e => e.UserId == CurrentUserId);
         });
 
         builder.Entity<RefreshToken>(entity =>
@@ -60,6 +65,7 @@ public class TimoDbContext(DbContextOptions<TimoDbContext> options) : IdentityUs
                   .WithMany(u => u.TimeEntries)
                   .HasForeignKey(e => e.UserId)
                   .OnDelete(DeleteBehavior.NoAction);
+            entity.HasQueryFilter(e => e.UserId == CurrentUserId);
         });
     }
 }

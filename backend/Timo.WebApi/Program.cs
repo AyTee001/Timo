@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
@@ -19,8 +19,12 @@ namespace Timo.WebApi
 
             builder.Services.AddDbContext<TimoDbContext>(options =>
                 options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+            builder.Services.AddHttpContextAccessor();
+            builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 
             builder.Services.AddDataProtection();
+            var jwtTokenService = new JwtTokenService(builder.Configuration);
+            builder.Services.AddSingleton(jwtTokenService);
 
             builder.Services.AddIdentityCore<ApplicationUser>(options =>
             {
@@ -32,26 +36,18 @@ namespace Timo.WebApi
             .AddDefaultTokenProviders();
 
             builder.Services
-                .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-                .AddCookie(options =>
+                .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(options =>
                 {
-                    options.Cookie.Name = "timo.auth";
-                    options.Cookie.HttpOnly = true;
-                    options.Cookie.SameSite = SameSiteMode.Strict;
-                    options.Cookie.SecurePolicy = requireHttps
-                        ? CookieSecurePolicy.Always
-                        : CookieSecurePolicy.SameAsRequest;
-                    options.ExpireTimeSpan = TimeSpan.FromMinutes(15);
-                    options.SlidingExpiration = false;
-                    options.Events.OnRedirectToLogin = context =>
+                    options.MapInboundClaims = true;
+                    options.TokenValidationParameters = jwtTokenService.CreateValidationParameters();
+                    options.Events = new JwtBearerEvents
                     {
-                        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                        return Task.CompletedTask;
-                    };
-                    options.Events.OnRedirectToAccessDenied = context =>
-                    {
-                        context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                        return Task.CompletedTask;
+                        OnMessageReceived = context =>
+                        {
+                            context.Token = context.Request.Cookies["timo.auth"];
+                            return Task.CompletedTask;
+                        }
                     };
                 });
             builder.Services.AddAuthorization();
@@ -67,8 +63,10 @@ namespace Timo.WebApi
             });
 
             builder.Services.AddScoped<ProjectRepository>();
+            builder.Services.AddScoped<TimeEntryRepository>();
             builder.Services.AddScoped<RefreshTokenRepository>();
             builder.Services.AddScoped<ProjectService>();
+            builder.Services.AddScoped<TimeEntryService>();
             builder.Services.AddControllersWithViews();
             builder.Services.AddOpenApi();
             var app = builder.Build();

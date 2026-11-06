@@ -7,8 +7,8 @@ public record SaveTimeEntryRequest
     [Required]
     public DateOnly Date { get; init; }
 
-    [Required]
-    public TimeSpan Duration { get; init; }
+    [Range(1, 1439)]
+    public int DurationMinutes { get; init; }
 
     [MaxLength(500)]
     public string? Description { get; init; }
@@ -23,7 +23,7 @@ public record TimeEntryResponse
 
     public DateOnly Date { get; init; }
 
-    public TimeSpan Duration { get; init; }
+    public int DurationMinutes { get; init; }
 
     public string? Description { get; init; }
 

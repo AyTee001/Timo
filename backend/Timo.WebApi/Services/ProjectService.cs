@@ -12,11 +12,11 @@ public sealed class ProjectNotFoundException(Guid id)
 
 public sealed class ProjectService(ProjectRepository repository)
 {
-    public Task<IReadOnlyList<ProjectSummary>> GetAllAsync(Guid userId, CancellationToken cancellationToken) =>
-        repository.GetAllForUserAsync(userId, cancellationToken);
+    public Task<IReadOnlyList<ProjectSummary>> GetAllAsync(CancellationToken cancellationToken) =>
+        repository.GetAllAsync(cancellationToken);
 
-    public async Task<ProjectSummary> GetByIdAsync(Guid id, Guid userId, CancellationToken cancellationToken) =>
-        await repository.GetForUserAsync(id, userId, cancellationToken)
+    public async Task<ProjectSummary> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        await repository.GetByIdAsync(id, cancellationToken)
         ?? throw new ProjectNotFoundException(id);
 
     public async Task<ProjectSummary> CreateAsync(
@@ -30,7 +30,7 @@ public sealed class ProjectService(ProjectRepository repository)
             throw new ArgumentException("Project name is required.");
         }
 
-        if (await repository.NameExistsAsync(name, userId, null, cancellationToken))
+        if (await repository.NameExistsAsync(name, null, cancellationToken))
         {
             throw new ProjectNameConflictException(name);
         }
@@ -47,11 +47,10 @@ public sealed class ProjectService(ProjectRepository repository)
 
     public async Task<ProjectSummary> UpdateAsync(
         Guid id,
-        Guid userId,
         SaveProjectRequest request,
         CancellationToken cancellationToken)
     {
-        var project = await repository.FindForUpdateAsync(id, userId, cancellationToken)
+        var project = await repository.FindForUpdateAsync(id, cancellationToken)
             ?? throw new ProjectNotFoundException(id);
         var name = request.Name.Trim();
 
@@ -60,7 +59,7 @@ public sealed class ProjectService(ProjectRepository repository)
             throw new ArgumentException("Project name is required.");
         }
 
-        if (await repository.NameExistsAsync(name, userId, id, cancellationToken))
+        if (await repository.NameExistsAsync(name, id, cancellationToken))
         {
             throw new ProjectNameConflictException(name);
         }
@@ -70,9 +69,9 @@ public sealed class ProjectService(ProjectRepository repository)
         return await repository.SaveChangesAsync(project, cancellationToken);
     }
 
-    public async Task DeleteAsync(Guid id, Guid userId, CancellationToken cancellationToken)
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken)
     {
-        if (!await repository.DeleteWithTimeEntriesAsync(id, userId, cancellationToken))
+        if (!await repository.DeleteWithTimeEntriesAsync(id, cancellationToken))
         {
             throw new ProjectNotFoundException(id);
         }

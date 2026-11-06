@@ -15,7 +15,7 @@ interface TimeEntryDialogProps {
   onOpenChange: (open: boolean) => void;
   entry?: TimeEntry;
   projects: Project[];
-  onSave: (data: TimeEntryInput) => void;
+  onSave: (data: TimeEntryInput) => Promise<void>;
 }
 
 const ERROR_TEXT = 'text-sm font-medium text-red-700';
@@ -59,7 +59,7 @@ function initialForm(entry?: TimeEntry): TimeEntryFormData {
 interface TimeEntryFormProps {
   entry?: TimeEntry;
   projects: Project[];
-  onSave: (data: TimeEntryInput) => void;
+  onSave: (data: TimeEntryInput) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -67,6 +67,8 @@ function TimeEntryForm({ entry, projects, onSave, onCancel }: TimeEntryFormProps
   const [form, setForm] = useState<TimeEntryFormData>(() => initialForm(entry));
   const [errors, setErrors] = useState<TimeEntryFormErrors>({});
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [saving, setSaving] = useState(false);
   const hasErrors = Object.keys(errors).length > 0;
 
   const update = (patch: Partial<TimeEntryFormData>) => {
@@ -75,19 +77,27 @@ function TimeEntryForm({ entry, projects, onSave, onCancel }: TimeEntryFormProps
     if (submitAttempted) setErrors(validate(next));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const found = validate(form);
     const durationMinutes = parseDurationInput(form.duration);
     setSubmitAttempted(true);
     setErrors(found);
     if (Object.keys(found).length === 0 && durationMinutes !== null) {
-      onSave({
-        projectId: form.projectId,
-        date: form.date,
-        durationMinutes,
-        description: form.description.trim(),
-      });
+      setSaving(true);
+      setSaveError('');
+      try {
+        await onSave({
+          projectId: form.projectId,
+          date: form.date,
+          durationMinutes,
+          description: form.description.trim(),
+        });
+      } catch (error) {
+        setSaveError(error instanceof Error ? error.message : 'Не вдалося зберегти запис.');
+      } finally {
+        setSaving(false);
+      }
     }
   };
 
@@ -96,6 +106,11 @@ function TimeEntryForm({ entry, projects, onSave, onCancel }: TimeEntryFormProps
       {submitAttempted && hasErrors && (
         <div role="alert" className="rounded-md border border-red-600 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
           Не вдалося зберегти запис. Перевірте обов’язкові поля.
+        </div>
+      )}
+      {saveError && (
+        <div role="alert" className="rounded-md border border-red-600 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+          {saveError}
         </div>
       )}
 
@@ -183,7 +198,9 @@ function TimeEntryForm({ entry, projects, onSave, onCancel }: TimeEntryFormProps
       </div>
 
       <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-start">
-        <Button type="submit" className="cursor-pointer">Зберегти запис</Button>
+        <Button type="submit" className="cursor-pointer" disabled={saving}>
+          {saving ? 'Збереження…' : 'Зберегти запис'}
+        </Button>
         <Button type="button" variant="secondary" className="cursor-pointer" onClick={onCancel}>
           Скасувати
         </Button>
@@ -213,7 +230,7 @@ export function TimeEntryDialog({ open, onOpenChange, entry, projects, onSave }:
         <TimeEntryForm
           entry={entry}
           projects={projects}
-          onSave={(data) => { onSave(data); onOpenChange(false); }}
+          onSave={async (data) => { await onSave(data); onOpenChange(false); }}
           onCancel={() => onOpenChange(false)}
         />
       </DialogContent>

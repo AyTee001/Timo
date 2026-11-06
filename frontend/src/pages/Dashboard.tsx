@@ -25,7 +25,7 @@ const PERIOD_OPTIONS: { value: PeriodPreset; label: string }[] = [
 const DAYS_UK = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 
 function getWeekRange(offset = 0): [string, string] {
-  const now = new Date('2026-10-30');
+  const now = new Date();
   const dayOfWeek = now.getDay();
   const monday = new Date(now);
   monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7) + offset * 7);
@@ -36,7 +36,7 @@ function getWeekRange(offset = 0): [string, string] {
 }
 
 function getMonthRange(offset = 0): [string, string] {
-  const now = new Date('2026-10-30');
+  const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth() + offset;
   const start = new Date(year, month, 1);

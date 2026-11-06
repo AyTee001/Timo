@@ -7,10 +7,8 @@ import { Dashboard } from './pages/Dashboard';
 import { TimeEntries } from './pages/TimeEntries';
 import { Projects } from './pages/Projects';
 import type { Page, Project, ProjectFormData, TimeEntry, TimeEntryInput } from './types';
-import { authApi, projectsApi, type AuthenticatedUser } from './services/api';
+import { authApi, projectsApi, timeEntriesApi, type AuthenticatedUser } from './services/api';
 import { toast } from 'sonner';
-
-let nextEntryId = 100;
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
@@ -21,6 +19,8 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [projectsLoading, setProjectsLoading] = useState(false);
   const [projectsError, setProjectsError] = useState('');
+  const [timeEntriesLoading, setTimeEntriesLoading] = useState(false);
+  const [timeEntriesError, setTimeEntriesError] = useState('');
 
   const loadProjects = async () => {
     setProjectsLoading(true);
@@ -35,6 +35,28 @@ export default function App() {
     }
   };
 
+  const loadTimeEntries = async () => {
+    setTimeEntriesLoading(true);
+    setTimeEntriesError('');
+    try {
+      setTimeEntries(await timeEntriesApi.list());
+    } catch (error) {
+      setTimeEntriesError(error instanceof Error ? error.message : 'Не вдалося завантажити записи часу.');
+      throw error;
+    } finally {
+      setTimeEntriesLoading(false);
+    }
+  };
+
+  const loadWorkspace = async () => {
+    const results = await Promise.allSettled([loadProjects(), loadTimeEntries()]);
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        toast.error(result.reason instanceof Error ? result.reason.message : 'Не вдалося завантажити дані.');
+      }
+    }
+  };
+
   useEffect(() => {
     let active = true;
     void (async () => {
@@ -43,11 +65,7 @@ export default function App() {
         if (!active) return;
         setUser(currentUser);
         if (currentUser) {
-          try {
-            await loadProjects();
-          } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Не вдалося завантажити проєкти.');
-          }
+          await loadWorkspace();
         }
       } catch {
         if (active) toast.error('Не вдалося підключитися до сервера.');
@@ -61,11 +79,7 @@ export default function App() {
 
   const handleAuthenticated = async (authenticatedUser: AuthenticatedUser) => {
     setUser(authenticatedUser);
-    try {
-      await loadProjects();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Не вдалося завантажити проєкти.');
-    }
+    await loadWorkspace();
   };
 
   const handleLogout = async () => {
@@ -75,30 +89,45 @@ export default function App() {
       setProjects([]);
       setProjectsError('');
       setTimeEntries([]);
+      setTimeEntriesError('');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Не вдалося вийти з облікового запису.');
     }
   };
 
-  const handleSaveEntry = (data: TimeEntryInput, entryId?: string) => {
-    const project = projects.find((p) => p.id === data.projectId);
-    if (!project) return;
-    const fields = {
-      date: data.date,
-      projectId: project.id,
-      projectName: project.name,
-      durationMinutes: data.durationMinutes,
-      description: data.description,
-    };
+  const handleSaveEntry = async (data: TimeEntryInput, entryId?: string) => {
+    const oldEntry = entryId ? timeEntries.find((entry) => entry.id === entryId) : undefined;
+    const savedEntry = entryId
+      ? await timeEntriesApi.update(entryId, data)
+      : await timeEntriesApi.create(data);
     if (entryId) {
-      setTimeEntries((prev) => prev.map((e) => (e.id === entryId ? { ...e, ...fields } : e)));
+      setTimeEntries((prev) => prev.map((entry) => entry.id === entryId ? savedEntry : entry));
     } else {
-      setTimeEntries((prev) => [...prev, { ...fields, id: `e${++nextEntryId}` }]);
+      setTimeEntries((prev) => [...prev, savedEntry]);
+    }
+    if (oldEntry && oldEntry.projectId !== savedEntry.projectId) {
+      setProjects((prev) => prev.map((project) => ({
+        ...project,
+        timeEntriesCount: Math.max(0, project.timeEntriesCount + (
+          project.id === oldEntry.projectId ? -1 : project.id === savedEntry.projectId ? 1 : 0
+        )),
+      })));
+    } else if (!oldEntry) {
+      setProjects((prev) => prev.map((project) => project.id === savedEntry.projectId
+        ? { ...project, timeEntriesCount: project.timeEntriesCount + 1 }
+        : project));
     }
   };
 
-  const handleDeleteEntry = (id: string) => {
+  const handleDeleteEntry = async (id: string) => {
+    const entry = timeEntries.find((item) => item.id === id);
+    await timeEntriesApi.delete(id);
     setTimeEntries((prev) => prev.filter((e) => e.id !== id));
+    if (entry) {
+      setProjects((prev) => prev.map((project) => project.id === entry.projectId
+        ? { ...project, timeEntriesCount: Math.max(0, project.timeEntriesCount - 1) }
+        : project));
+    }
   };
 
   const handleSaveProject = async (data: ProjectFormData, projectId?: string) => {
@@ -153,6 +182,10 @@ export default function App() {
             projects={projects}
             onSave={handleSaveEntry}
             onDelete={handleDeleteEntry}
+            isLoading={timeEntriesLoading}
+            loadError={timeEntriesError}
+            onRetry={() => { void loadTimeEntries().catch(() => undefined); }}
+            onNavigateToProjects={() => setCurrentPage('projects')}
           />
         )}
         {currentPage === 'projects' && (
