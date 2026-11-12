@@ -7,6 +7,7 @@ import { DeleteConfirmDialog } from '../components/DeleteConfirmDialog';
 import type { Project, TimeEntry, TimeEntryInput } from '../types';
 import { formatDuration, formatDate } from '../data/mockData';
 import { toast } from 'sonner';
+import { getUserErrorMessage } from '../services/api';
 
 interface TimeEntriesProps {
   timeEntries: TimeEntry[];
@@ -170,7 +171,7 @@ export function TimeEntries({
             await onDelete(deleteTarget.id);
             setDeleteTarget(null);
           } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Не вдалося видалити запис.');
+            toast.error(getUserErrorMessage(error, 'Не вдалося видалити запис. Спробуйте ще раз.'));
           }
         }}
       />

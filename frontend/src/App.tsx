@@ -8,7 +8,7 @@ import { Dashboard } from './pages/Dashboard';
 import { TimeEntries } from './pages/TimeEntries';
 import { Projects } from './pages/Projects';
 import type { Page, Project, ProjectFormData, TimeEntry, TimeEntryInput } from './types';
-import { authApi, projectsApi, timeEntriesApi, type AuthenticatedUser } from './services/api';
+import { authApi, getUserErrorMessage, projectsApi, timeEntriesApi, type AuthenticatedUser } from './services/api';
 import { toast } from 'sonner';
 
 export default function App() {
@@ -30,7 +30,7 @@ export default function App() {
     try {
       setProjects(await projectsApi.list());
     } catch (error) {
-      setProjectsError(error instanceof Error ? error.message : 'Не вдалося завантажити проєкти.');
+      setProjectsError(getUserErrorMessage(error, 'Не вдалося завантажити проєкти. Спробуйте ще раз.'));
       throw error;
     } finally {
       setProjectsLoading(false);
@@ -43,7 +43,7 @@ export default function App() {
     try {
       setTimeEntries(await timeEntriesApi.list());
     } catch (error) {
-      setTimeEntriesError(error instanceof Error ? error.message : 'Не вдалося завантажити записи часу.');
+      setTimeEntriesError(getUserErrorMessage(error, 'Не вдалося завантажити записи часу. Спробуйте ще раз.'));
       throw error;
     } finally {
       setTimeEntriesLoading(false);
@@ -54,7 +54,7 @@ export default function App() {
     const results = await Promise.allSettled([loadProjects(), loadTimeEntries()]);
     for (const result of results) {
       if (result.status === 'rejected') {
-        toast.error(result.reason instanceof Error ? result.reason.message : 'Не вдалося завантажити дані.');
+        toast.error(getUserErrorMessage(result.reason, 'Не вдалося завантажити дані. Спробуйте ще раз.'));
       }
     }
   };
@@ -70,7 +70,7 @@ export default function App() {
           await loadWorkspace();
         }
       } catch {
-        if (active) toast.error('Не вдалося підключитися до сервера.');
+          if (active) toast.error('Не вдалося завантажити дані. Спробуйте ще раз.');
       } finally {
         if (active) setAuthLoading(false);
       }
@@ -94,7 +94,7 @@ export default function App() {
       setTimeEntries([]);
       setTimeEntriesError('');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Не вдалося вийти з облікового запису.');
+      toast.error(getUserErrorMessage(error, 'Не вдалося вийти з облікового запису. Спробуйте ще раз.'));
     }
   };
 

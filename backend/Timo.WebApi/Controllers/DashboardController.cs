@@ -37,8 +37,8 @@ public class DashboardController(TimoDbContext context) : ControllerBase
             return BadRequest(new ProblemDetails
             {
                 Status = StatusCodes.Status400BadRequest,
-                Title = "Invalid Date Range",
-                Detail = "The 'To' date cannot be earlier than the 'From' date."
+                Title = "Некоректний період.",
+                Detail = "Дата завершення не може бути раніше за дату початку."
             });
         }
 

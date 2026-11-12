@@ -4,11 +4,11 @@ using Timo.Infrastructure.Repositories;
 
 namespace Timo.WebApi.Services;
 
-public sealed class TimeEntryNotFoundException(Guid id)
-    : Exception($"Time entry with ID '{id}' was not found.");
+public sealed class TimeEntryNotFoundException()
+    : Exception("Запис часу не знайдено.");
 
-public sealed class TimeEntryProjectNotFoundException(Guid id)
-    : Exception($"Project with ID '{id}' was not found.");
+public sealed class TimeEntryProjectNotFoundException()
+    : Exception("Проєкт не знайдено.");
 
 public sealed class TimeEntryService(TimeEntryRepository repository)
 {
@@ -17,7 +17,7 @@ public sealed class TimeEntryService(TimeEntryRepository repository)
 
     public async Task<TimeEntrySummary> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         await repository.GetByIdAsync(id, cancellationToken)
-        ?? throw new TimeEntryNotFoundException(id);
+        ?? throw new TimeEntryNotFoundException();
 
     public async Task<TimeEntrySummary> CreateAsync(
         Guid userId,
@@ -43,7 +43,7 @@ public sealed class TimeEntryService(TimeEntryRepository repository)
         CancellationToken cancellationToken)
     {
         var entry = await repository.FindForUpdateAsync(id, cancellationToken)
-            ?? throw new TimeEntryNotFoundException(id);
+            ?? throw new TimeEntryNotFoundException();
         await EnsureProjectExistsAsync(request.ProjectId, cancellationToken);
 
         entry.Date = request.Date;
@@ -58,7 +58,7 @@ public sealed class TimeEntryService(TimeEntryRepository repository)
     {
         if (!await repository.DeleteAsync(id, cancellationToken))
         {
-            throw new TimeEntryNotFoundException(id);
+            throw new TimeEntryNotFoundException();
         }
     }
 
@@ -66,7 +66,7 @@ public sealed class TimeEntryService(TimeEntryRepository repository)
     {
         if (!await repository.ProjectExistsAsync(projectId, cancellationToken))
         {
-            throw new TimeEntryProjectNotFoundException(projectId);
+            throw new TimeEntryProjectNotFoundException();
         }
     }
 

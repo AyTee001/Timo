@@ -7,6 +7,7 @@ import { DeleteConfirmDialog } from '../components/DeleteConfirmDialog';
 import type { Project, ProjectFormData } from '../types';
 import { formatDate } from '../data/mockData';
 import { toast } from 'sonner';
+import { getUserErrorMessage } from '../services/api';
 
 interface ProjectsProps {
   projects: Project[];
@@ -136,7 +137,7 @@ export function Projects({ projects, onSave, onDelete, isLoading, loadError, onR
             await onDelete(deleteTarget.id);
             setDeleteTarget(null);
           } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Не вдалося видалити проєкт.');
+            toast.error(getUserErrorMessage(error, 'Не вдалося видалити проєкт. Спробуйте ще раз.'));
           }
         }}
       />

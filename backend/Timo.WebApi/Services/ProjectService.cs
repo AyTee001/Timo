@@ -4,11 +4,11 @@ using Timo.WebApi.DTOs;
 
 namespace Timo.WebApi.Services;
 
-public sealed class ProjectNameConflictException(string name)
-    : Exception($"A project named '{name}' already exists.");
+public sealed class ProjectNameConflictException()
+    : Exception("Проєкт із такою назвою вже існує.");
 
-public sealed class ProjectNotFoundException(Guid id)
-    : Exception($"Project with ID '{id}' was not found.");
+public sealed class ProjectNotFoundException()
+    : Exception("Проєкт не знайдено.");
 
 public sealed class ProjectService(ProjectRepository repository)
 {
@@ -17,7 +17,7 @@ public sealed class ProjectService(ProjectRepository repository)
 
     public async Task<ProjectSummary> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         await repository.GetByIdAsync(id, cancellationToken)
-        ?? throw new ProjectNotFoundException(id);
+        ?? throw new ProjectNotFoundException();
 
     public async Task<ProjectSummary> CreateAsync(
         Guid userId,
@@ -27,12 +27,12 @@ public sealed class ProjectService(ProjectRepository repository)
         var name = request.Name.Trim();
         if (name.Length == 0)
         {
-            throw new ArgumentException("Project name is required.");
+            throw new ArgumentException("Введіть назву проєкту.");
         }
 
         if (await repository.NameExistsAsync(name, null, cancellationToken))
         {
-            throw new ProjectNameConflictException(name);
+            throw new ProjectNameConflictException();
         }
 
         return await repository.AddAsync(new Project
@@ -51,17 +51,17 @@ public sealed class ProjectService(ProjectRepository repository)
         CancellationToken cancellationToken)
     {
         var project = await repository.FindForUpdateAsync(id, cancellationToken)
-            ?? throw new ProjectNotFoundException(id);
+            ?? throw new ProjectNotFoundException();
         var name = request.Name.Trim();
 
         if (name.Length == 0)
         {
-            throw new ArgumentException("Project name is required.");
+            throw new ArgumentException("Введіть назву проєкту.");
         }
 
         if (await repository.NameExistsAsync(name, id, cancellationToken))
         {
-            throw new ProjectNameConflictException(name);
+            throw new ProjectNameConflictException();
         }
 
         project.Name = name;
@@ -73,7 +73,7 @@ public sealed class ProjectService(ProjectRepository repository)
     {
         if (!await repository.DeleteWithTimeEntriesAsync(id, cancellationToken))
         {
-            throw new ProjectNotFoundException(id);
+            throw new ProjectNotFoundException();
         }
     }
 

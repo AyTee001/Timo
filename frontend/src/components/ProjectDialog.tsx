@@ -5,6 +5,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from './ui/dialog';
+import { getUserErrorMessage } from '../services/api';
 import type { Project, ProjectFormData, ProjectFormErrors } from '../types';
 import { cn } from '../lib/utils';
 
@@ -61,7 +62,7 @@ function ProjectForm({ project, onSave, onCancel }: ProjectFormProps) {
       try {
         await onSave({ name: form.name.trim(), description: form.description.trim() });
       } catch (error) {
-        setSaveError(error instanceof Error ? error.message : 'Не вдалося зберегти проєкт.');
+        setSaveError(getUserErrorMessage(error, 'Не вдалося зберегти проєкт. Спробуйте ще раз.'));
       } finally {
         setSaving(false);
       }

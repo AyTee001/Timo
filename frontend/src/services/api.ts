@@ -1,8 +1,6 @@
 import type { Project, ProjectFormData, TimeEntry, TimeEntryInput } from '../types';
 
 interface ApiErrorBody {
-  title?: string;
-  detail?: string;
   errors?: Record<string, string[]>;
 }
 
@@ -19,6 +17,22 @@ export class ApiError extends Error {
   }
 }
 
+const identityErrorMessages: Record<string, string> = {
+  DuplicateEmail: 'Ця електронна адреса вже використовується.',
+  DuplicateUserName: 'Ця електронна адреса вже використовується.',
+  InvalidEmail: 'Вкажіть коректну електронну адресу.',
+  PasswordTooShort: 'Пароль має містити щонайменше 8 символів.',
+  PasswordRequiresDigit: 'Пароль має містити принаймні одну цифру.',
+  PasswordRequiresLower: 'Пароль має містити принаймні одну малу літеру.',
+  PasswordRequiresUpper: 'Пароль має містити принаймні одну велику літеру.',
+  PasswordRequiresNonAlphanumeric: 'Пароль має містити принаймні один спеціальний символ.',
+  PasswordRequiresUniqueChars: 'Пароль має містити більше унікальних символів.',
+};
+
+export function getUserErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof ApiError ? error.message : fallback;
+}
+
 export interface AuthenticatedUser {
   email: string;
 }
@@ -27,7 +41,9 @@ let refreshInProgress: Promise<boolean> | null = null;
 
 async function getCsrfToken(): Promise<string> {
   const response = await fetch('/api/auth/csrf', { credentials: 'include' });
-  if (!response.ok) throw new ApiError('Не вдалося отримати токен захисту запиту.', response.status);
+  if (!response.ok) {
+    throw new ApiError('Не вдалося виконати дію. Оновіть сторінку та спробуйте ще раз.', response.status);
+  }
   const result = await response.json() as { requestToken: string };
   return result.requestToken;
 }
@@ -70,13 +86,27 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   const body = await response.json().catch(() => null) as ApiErrorBody | null;
   if (!response.ok) {
-    const validationMessage = body?.errors
-      ? Object.values(body.errors).flat().join(' ')
-      : undefined;
-    throw new ApiError(
-      validationMessage || body?.detail || body?.title || 'Не вдалося виконати запит.',
-      response.status,
-    );
+    const identityMessage = path === '/api/auth/register' && body?.errors
+      ? Object.keys(body.errors)
+        .map((code) => identityErrorMessages[code])
+        .filter((message): message is string => !!message)
+        .join(' ')
+      : '';
+    const message = identityMessage
+      || (response.status === 400
+        ? 'Перевірте правильність введених даних.'
+        : response.status === 401 && path === '/api/auth/login'
+          ? 'Неправильна електронна адреса або пароль.'
+          : response.status === 401
+            ? 'Сеанс завершився. Увійдіть знову.'
+            : response.status === 403
+              ? 'У вас немає дозволу виконати цю дію.'
+              : response.status === 404
+                ? 'Не вдалося знайти потрібні дані. Оновіть сторінку та спробуйте ще раз.'
+                : response.status === 409
+                  ? 'Проєкт із такою назвою вже існує.'
+                  : 'Не вдалося виконати запит. Спробуйте ще раз.');
+    throw new ApiError(message, response.status);
   }
 
   return body as T;

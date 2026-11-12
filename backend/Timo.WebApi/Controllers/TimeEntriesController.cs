@@ -35,7 +35,7 @@ public sealed class TimeEntriesController(TimeEntryService timeEntryService) : C
             return NotFound(new ProblemDetails
             {
                 Status = StatusCodes.Status404NotFound,
-                Title = "Time entry not found"
+                Title = "Запис часу не знайдено."
             });
         }
     }
@@ -109,7 +109,7 @@ public sealed class TimeEntriesController(TimeEntryService timeEntryService) : C
             return userId;
         }
 
-        throw new UnauthorizedAccessException("User ID claim is missing or invalid.");
+        throw new UnauthorizedAccessException("Не вдалося виконати запит.");
     }
 
     private static TimeEntryResponse ToResponse(TimeEntrySummary entry) => new()
@@ -126,15 +126,13 @@ public sealed class TimeEntriesController(TimeEntryService timeEntryService) : C
         new(new ProblemDetails
         {
             Status = StatusCodes.Status404NotFound,
-            Title = "Time entry not found",
-            Detail = $"Time entry with ID '{id}' was not found."
+            Title = "Запис часу не знайдено."
         });
 
     private static NotFoundObjectResult ProjectNotFound(Guid id) =>
         new(new ProblemDetails
         {
             Status = StatusCodes.Status404NotFound,
-            Title = "Project not found",
-            Detail = $"Project with ID '{id}' does not exist or is inaccessible."
+            Title = "Проєкт не знайдено."
         });
 }

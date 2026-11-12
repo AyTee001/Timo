@@ -81,7 +81,7 @@ public sealed class AuthController(
             return Unauthorized(new ProblemDetails
             {
                 Status = StatusCodes.Status401Unauthorized,
-                Title = "Invalid email or password"
+                Title = "Неправильна електронна адреса або пароль."
             });
         }
 
@@ -230,9 +230,28 @@ public sealed class AuthController(
     {
         foreach (var error in errors)
         {
-            ModelState.AddModelError(error.Code, error.Description);
+            ModelState.AddModelError(error.Code, TranslateIdentityError(error.Code));
         }
 
-        return ValidationProblem(ModelState);
+        return BadRequest(new ValidationProblemDetails(ModelState)
+        {
+            Status = StatusCodes.Status400BadRequest,
+            Title = "Не вдалося створити обліковий запис.",
+            Detail = "Перевірте введені дані."
+        });
     }
+
+    private static string TranslateIdentityError(string code) =>
+        code switch
+        {
+            "DuplicateEmail" or "DuplicateUserName" => "Ця електронна адреса вже використовується.",
+            "InvalidEmail" => "Вкажіть коректну електронну адресу.",
+            "PasswordTooShort" => "Пароль має містити щонайменше 8 символів.",
+            "PasswordRequiresDigit" => "Пароль має містити принаймні одну цифру.",
+            "PasswordRequiresLower" => "Пароль має містити принаймні одну малу літеру.",
+            "PasswordRequiresUpper" => "Пароль має містити принаймні одну велику літеру.",
+            "PasswordRequiresNonAlphanumeric" => "Пароль має містити принаймні один спеціальний символ.",
+            "PasswordRequiresUniqueChars" => "Пароль має містити більше унікальних символів.",
+            _ => "Не вдалося створити обліковий запис. Перевірте введені дані."
+        };
 }

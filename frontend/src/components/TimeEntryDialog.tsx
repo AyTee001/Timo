@@ -5,6 +5,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from './ui/dialog';
+import { getUserErrorMessage } from '../services/api';
 import type { Project, TimeEntry, TimeEntryFormData, TimeEntryFormErrors, TimeEntryInput } from '../types';
 import { DESCRIPTION_MAX_LENGTH } from '../data/mockData';
 import { formatDurationInput, minutesToDurationInput, parseDurationInput } from '../lib/duration';
@@ -94,7 +95,7 @@ function TimeEntryForm({ entry, projects, onSave, onCancel }: TimeEntryFormProps
           description: form.description.trim(),
         });
       } catch (error) {
-        setSaveError(error instanceof Error ? error.message : 'Не вдалося зберегти запис.');
+        setSaveError(getUserErrorMessage(error, 'Не вдалося зберегти запис. Спробуйте ще раз.'));
       } finally {
         setSaving(false);
       }

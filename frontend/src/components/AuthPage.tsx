@@ -3,7 +3,7 @@ import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { ApiError, authApi, type AuthenticatedUser } from '../services/api';
+import { authApi, getUserErrorMessage, type AuthenticatedUser } from '../services/api';
 
 interface AuthPageProps {
   initialMode: 'login' | 'register';
@@ -21,15 +21,47 @@ export function AuthPage({ initialMode, onAuthenticated, onBack }: AuthPageProps
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError('');
+
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) {
+      setError('Введіть електронну адресу.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+$/.test(normalizedEmail)) {
+      setError('Вкажіть коректну електронну адресу.');
+      return;
+    }
+    if (normalizedEmail.length > 256) {
+      setError('Електронна адреса не може перевищувати 256 символів.');
+      return;
+    }
+    if (!password) {
+      setError('Введіть пароль.');
+      return;
+    }
+    if (password.length < 8) {
+      setError('Пароль має містити щонайменше 8 символів.');
+      return;
+    }
+    if (password.length > 128) {
+      setError('Пароль не може перевищувати 128 символів.');
+      return;
+    }
+
     setSubmitting(true);
 
     try {
       const user = isRegistering
-        ? await authApi.register(email, password)
-        : await authApi.login(email, password);
+        ? await authApi.register(normalizedEmail, password)
+        : await authApi.login(normalizedEmail, password);
       await onAuthenticated(user);
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : 'Не вдалося підключитися до сервера.');
+      setError(getUserErrorMessage(
+        cause,
+        isRegistering
+          ? 'Не вдалося створити обліковий запис. Перевірте з’єднання та спробуйте ще раз.'
+          : 'Не вдалося увійти. Перевірте з’єднання та спробуйте ще раз.',
+      ));
     } finally {
       setSubmitting(false);
     }
@@ -51,7 +83,7 @@ export function AuthPage({ initialMode, onAuthenticated, onBack }: AuthPageProps
           </p>
         </div>
 
-        <form className="flex flex-col gap-4" onSubmit={submit}>
+        <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
           <div className="flex flex-col gap-2">
             <Label htmlFor="auth-email">Електронна пошта</Label>
             <Input

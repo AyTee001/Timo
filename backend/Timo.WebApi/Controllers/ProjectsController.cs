@@ -35,7 +35,7 @@ public sealed class ProjectsController(ProjectService projectService) : Controll
             return NotFound(new ProblemDetails
             {
                 Status = StatusCodes.Status404NotFound,
-                Title = "Project not found"
+                Title = "Проєкт не знайдено."
             });
         }
     }
@@ -60,14 +60,13 @@ public sealed class ProjectsController(ProjectService projectService) : Controll
             return Conflict(new ProblemDetails
             {
                 Status = StatusCodes.Status409Conflict,
-                Title = "Project already exists",
-                Detail = exception.Message
+                Title = exception.Message
             });
         }
         catch (ArgumentException exception)
         {
             ModelState.AddModelError(nameof(request.Name), exception.Message);
-            return ValidationProblem(ModelState);
+            return ValidationProblemInUkrainian();
         }
     }
 
@@ -92,7 +91,7 @@ public sealed class ProjectsController(ProjectService projectService) : Controll
             return NotFound(new ProblemDetails
             {
                 Status = StatusCodes.Status404NotFound,
-                Title = "Project not found"
+                Title = "Проєкт не знайдено."
             });
         }
         catch (ProjectNameConflictException exception)
@@ -100,14 +99,13 @@ public sealed class ProjectsController(ProjectService projectService) : Controll
             return Conflict(new ProblemDetails
             {
                 Status = StatusCodes.Status409Conflict,
-                Title = "Project already exists",
-                Detail = exception.Message
+                Title = exception.Message
             });
         }
         catch (ArgumentException exception)
         {
             ModelState.AddModelError(nameof(request.Name), exception.Message);
-            return ValidationProblem(ModelState);
+            return ValidationProblemInUkrainian();
         }
     }
 
@@ -127,13 +125,21 @@ public sealed class ProjectsController(ProjectService projectService) : Controll
             return NotFound(new ProblemDetails
             {
                 Status = StatusCodes.Status404NotFound,
-                Title = "Project not found"
+                Title = "Проєкт не знайдено."
             });
         }
     }
 
     private Guid GetCurrentUserId() =>
         Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+    private BadRequestObjectResult ValidationProblemInUkrainian() =>
+        BadRequest(new ValidationProblemDetails(ModelState)
+        {
+            Status = StatusCodes.Status400BadRequest,
+            Title = "Некоректні дані.",
+            Detail = "Перевірте правильність заповнення полів."
+        });
 
     private static ProjectResponse ToResponse(ProjectSummary project) =>
         new(project.Id, project.Name, project.Description, project.CreatedAtUtc, project.TimeEntriesCount);
