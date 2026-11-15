@@ -1,0 +1,416 @@
+openapi: 3.1.0
+info:
+  title: Timo API — ключові операції
+  version: 1.0.0
+  description: >-
+    OpenAPI-опис трьох ключових операцій API: перегляд статистики дашборду,
+    створення проєкту та створення запису часу.
+servers:
+  - url: https://localhost:7276
+    description: Локальний сервер розробки
+paths:
+  /api/dashboard:
+    get:
+      tags: [Dashboard]
+      operationId: getDashboardData
+      summary: Отримати статистику дашборду
+      description: >-
+        Повертає сумарний час, кількість активних проєктів і записів та
+        розподіл часу за проєктами й днями. Якщо дати не передані, використовується
+        поточний тиждень (понеділок—неділя). Дата завершення не може бути раніше
+        дати початку. Потрібна автентифікація через cookie timo.auth.
+      security:
+        - CookieAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: false
+          description: Початок періоду включно; за замовчуванням — понеділок поточного тижня.
+          schema:
+            type: string
+            format: date
+          example: '2026-11-09'
+        - name: to
+          in: query
+          required: false
+          description: Кінець періоду включно; за замовчуванням — неділя поточного тижня.
+          schema:
+            type: string
+            format: date
+          example: '2026-11-15'
+      responses:
+        '200':
+          description: Статистика дашборду за запитаний період.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardResponse'
+              examples:
+                weeklyDashboard:
+                  summary: Зведення за поточний тиждень
+                  value:
+                    totalDuration: '24:30:00'
+                    activeProjectsCount: 2
+                    totalEntriesCount: 8
+                    projectBreakdown:
+                      - projectId: 7f4e3e3a-9632-4c0a-a53e-b9e47a3a1c51
+                        projectName: Design work
+                        totalDuration: '15:00:00'
+                        percentage: 61.2
+                      - projectId: 20ce6c60-28d0-4295-89d1-7090527478d0
+                        projectName: Research
+                        totalDuration: '09:30:00'
+                        percentage: 38.8
+                    dailyBreakdown:
+                      - date: '2026-11-09'
+                        dayOfWeek: Monday
+                        totalDuration: '04:00:00'
+                      - date: '2026-11-10'
+                        dayOfWeek: Tuesday
+                        totalDuration: '03:30:00'
+                      - date: '2026-11-11'
+                        dayOfWeek: Wednesday
+                        totalDuration: '05:00:00'
+                      - date: '2026-11-12'
+                        dayOfWeek: Thursday
+                        totalDuration: '04:00:00'
+                      - date: '2026-11-13'
+                        dayOfWeek: Friday
+                        totalDuration: '03:00:00'
+                      - date: '2026-11-14'
+                        dayOfWeek: Saturday
+                        totalDuration: '03:00:00'
+                      - date: '2026-11-15'
+                        dayOfWeek: Sunday
+                        totalDuration: '02:00:00'
+        '400':
+          description: Некоректний період або помилка прив'язки параметра дати. Якщо to раніше за from, повертається ProblemDetails.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+              example:
+                type: about:blank
+                title: Некоректний період.
+                status: 400
+                detail: Дата завершення не може бути раніше за дату початку.
+        '401':
+          description: Відсутня або недійсна cookie автентифікації; тіло відповіді не гарантоване.
+  /api/projects:
+    post:
+      tags: [Projects]
+      operationId: createProject
+      summary: Створити проєкт
+      description: >-
+        Створює проєкт для поточного користувача. Потрібні cookie автентифікації
+        timo.auth та antiforgery-токен у заголовку X-CSRF-TOKEN (його можна отримати
+        через GET /api/auth/csrf). Назва обрізається по краях; назви проєктів мають
+        бути унікальними.
+      security:
+        - CookieAuth: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveProjectRequest'
+            example:
+              name: Design work
+              description: UX and interface improvements
+      responses:
+        '201':
+          description: Проєкт створено.
+          headers:
+            Location:
+              description: URL створеного проєкту (операція GET /api/projects/{id}).
+              schema:
+                type: string
+                format: uri-reference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResponse'
+              example:
+                id: 7f4e3e3a-9632-4c0a-a53e-b9e47a3a1c51
+                name: Design work
+                description: UX and interface improvements
+                createdAt: '2026-11-13T21:15:00Z'
+                timeEntriesCount: 0
+        '400':
+          description: Некоректні поля запиту або відсутній/недійсний antiforgery-токен. Для помилки валідації повертається ValidationProblemDetails; для antiforgery-помилки тіло може бути відсутнім.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ValidationProblemDetails'
+              example:
+                type: about:blank
+                title: Некоректні дані.
+                status: 400
+                detail: Перевірте правильність заповнення полів.
+                errors:
+                  Name:
+                    - Введіть назву проєкту.
+        '401':
+          description: Відсутня або недійсна cookie автентифікації; тіло відповіді не гарантоване.
+        '409':
+          description: Проєкт із такою назвою вже існує.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+              example:
+                type: about:blank
+                title: Проєкт із такою назвою вже існує.
+                status: 409
+  /api/time-entries:
+    post:
+      tags: [TimeEntries]
+      operationId: createTimeEntry
+      summary: Створити запис часу
+      description: >-
+        Створює запис часу для вказаного проєкту поточного користувача. Тривалість
+        задається у хвилинах (від 1 до 1439). Потрібні cookie автентифікації
+        timo.auth та antiforgery-токен у заголовку X-CSRF-TOKEN (його можна отримати
+        через GET /api/auth/csrf).
+      security:
+        - CookieAuth: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveTimeEntryRequest'
+            example:
+              date: '2026-11-13'
+              durationMinutes: 75
+              description: Design review
+              projectId: 7f4e3e3a-9632-4c0a-a53e-b9e47a3a1c51
+      responses:
+        '201':
+          description: Запис часу створено.
+          headers:
+            Location:
+              description: URL створеного запису часу (операція GET /api/time-entries/{id}).
+              schema:
+                type: string
+                format: uri-reference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimeEntryResponse'
+              example:
+                id: 52ea5595-19c5-4715-8919-61591fd65c0f
+                date: '2026-11-13'
+                durationMinutes: 75
+                description: Design review
+                projectId: 7f4e3e3a-9632-4c0a-a53e-b9e47a3a1c51
+                projectName: Design work
+        '400':
+          description: Некоректні поля запиту або відсутній/недійсний antiforgery-токен. Для помилки валідації повертається ValidationProblemDetails; для antiforgery-помилки тіло може бути відсутнім.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ValidationProblemDetails'
+              example:
+                type: about:blank
+                title: Некоректні дані.
+                status: 400
+                detail: Перевірте правильність заповнення полів.
+                errors:
+                  DurationMinutes:
+                    - Значення має бути від 1 до 1439.
+        '401':
+          description: Відсутня або недійсна cookie автентифікації; тіло відповіді не гарантоване.
+        '404':
+          description: Проєкт із вказаним projectId не знайдено.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+              example:
+                type: about:blank
+                title: Проєкт не знайдено.
+                status: 404
+components:
+  securitySchemes:
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: timo.auth
+      description: Access-token cookie, встановлена сервером після входу або реєстрації.
+    CsrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-TOKEN
+      description: Request-token, повернений GET /api/auth/csrf.
+  schemas:
+    ProblemDetails:
+      type: object
+      description: Формат помилки ProblemDetails, який повертають контролери для помилок предметної області.
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          example: about:blank
+        title:
+          type: string
+          example: Ресурс не знайдено.
+        status:
+          type: integer
+          example: 404
+        detail:
+          type: string
+          example: Додаткова інформація про помилку.
+        instance:
+          type: string
+          format: uri-reference
+    ValidationProblemDetails:
+      allOf:
+        - $ref: '#/components/schemas/ProblemDetails'
+        - type: object
+          properties:
+            errors:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: string
+      example:
+        type: about:blank
+        title: Некоректні дані.
+        status: 400
+        errors:
+          Name:
+            - Назва обов'язкова.
+    SaveProjectRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          description: Назва проєкту; має бути унікальною.
+          example: Design work
+        description:
+          type: [string, 'null']
+          maxLength: 500
+          example: UX and interface improvements
+    ProjectResponse:
+      type: object
+      required: [id, name, createdAt, timeEntriesCount]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: [string, 'null']
+        createdAt:
+          type: string
+          format: date-time
+        timeEntriesCount:
+          type: integer
+          format: int32
+          minimum: 0
+    SaveTimeEntryRequest:
+      type: object
+      additionalProperties: false
+      required: [date, durationMinutes, projectId]
+      properties:
+        date:
+          type: string
+          format: date
+          example: '2026-11-13'
+        durationMinutes:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 1439
+          example: 75
+        description:
+          type: [string, 'null']
+          maxLength: 500
+          example: Design review
+        projectId:
+          type: string
+          format: uuid
+          example: 7f4e3e3a-9632-4c0a-a53e-b9e47a3a1c51
+    TimeEntryResponse:
+      type: object
+      required: [id, date, durationMinutes, projectId, projectName]
+      properties:
+        id:
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date
+        durationMinutes:
+          type: integer
+          format: int32
+        description:
+          type: [string, 'null']
+        projectId:
+          type: string
+          format: uuid
+        projectName:
+          type: string
+    DashboardResponse:
+      type: object
+      required: [totalDuration, activeProjectsCount, totalEntriesCount, projectBreakdown, dailyBreakdown]
+      properties:
+        totalDuration:
+          type: string
+          description: Загальний час у форматі TimeSpan, наприклад HH:mm:ss.
+          example: '24:30:00'
+        activeProjectsCount:
+          type: integer
+          format: int32
+          minimum: 0
+        totalEntriesCount:
+          type: integer
+          format: int32
+          minimum: 0
+        projectBreakdown:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectTimeShare'
+        dailyBreakdown:
+          type: array
+          items:
+            $ref: '#/components/schemas/DailyTimeShare'
+    ProjectTimeShare:
+      type: object
+      required: [projectId, projectName, totalDuration, percentage]
+      properties:
+        projectId:
+          type: string
+          format: uuid
+        projectName:
+          type: string
+        totalDuration:
+          type: string
+          example: '15:00:00'
+        percentage:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 100
+          example: 61.2
+    DailyTimeShare:
+      type: object
+      required: [date, dayOfWeek, totalDuration]
+      properties:
+        date:
+          type: string
+          format: date
+        dayOfWeek:
+          type: string
+          example: Monday
+        totalDuration:
+          type: string
+          example: '04:00:00'

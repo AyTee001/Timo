@@ -121,3 +121,31 @@ VALUES (N'20261106134113_AddProjectDetailsAndRefreshTokens', N'10.0.14');
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+DROP INDEX [IX_TimeEntries_UserId] ON [TimeEntries];
+
+CREATE INDEX [IX_TimeEntries_UserId_Date_ProjectId] ON [TimeEntries] ([UserId], [Date], [ProjectId]);
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20261113221358_AddTimeEntryUserDateProjectIndex', N'10.0.14');
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+DROP INDEX [EmailIndex] ON [Users];
+
+DROP INDEX [IX_Projects_UserId] ON [Projects];
+
+CREATE UNIQUE INDEX [EmailIndex] ON [Users] ([NormalizedEmail]) WHERE [NormalizedEmail] IS NOT NULL;
+
+ALTER TABLE [TimeEntries] ADD CONSTRAINT [CK_TimeEntries_Duration] CHECK ([Duration] > '00:00:00');
+
+CREATE UNIQUE INDEX [IX_Projects_UserId_Name] ON [Projects] ([UserId], [Name]);
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20261115213119_AddUserProjectAndTimeEntryConstraints', N'10.0.14');
+
+COMMIT;
+GO
+

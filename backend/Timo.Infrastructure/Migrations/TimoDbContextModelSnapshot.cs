@@ -146,7 +146,9 @@ namespace Timo.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("NormalizedEmail")
-                        .HasDatabaseName("EmailIndex");
+                        .IsUnique()
+                        .HasDatabaseName("EmailIndex")
+                        .HasFilter("[NormalizedEmail] IS NOT NULL");
 
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()
@@ -181,7 +183,8 @@ namespace Timo.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId", "Name")
+                        .IsUnique();
 
                     b.ToTable("Projects", (string)null);
                 });
@@ -245,9 +248,12 @@ namespace Timo.Infrastructure.Migrations
 
                     b.HasIndex("ProjectId");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId", "Date", "ProjectId");
 
-                    b.ToTable("TimeEntries", (string)null);
+                    b.ToTable("TimeEntries", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_TimeEntries_Duration", "[Duration] > '00:00:00'");
+                        });
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>

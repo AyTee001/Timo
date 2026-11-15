@@ -21,6 +21,10 @@ public class TimoDbContext(
         builder.Entity<ApplicationUser>(entity =>
         {
             entity.ToTable("Users");
+
+            entity.HasIndex(u => u.NormalizedEmail)
+                  .IsUnique()
+                  .HasDatabaseName("EmailIndex");
         });
 
         builder.Entity<Project>(entity =>
@@ -31,10 +35,14 @@ public class TimoDbContext(
             entity.Property(e => e.Description).HasMaxLength(500);
             entity.Property(e => e.CreatedAtUtc).HasDefaultValueSql("SYSUTCDATETIME()");
 
+            entity.HasIndex(e => new { e.UserId, e.Name })
+                  .IsUnique();
+
             entity.HasOne(e => e.User)
                   .WithMany(u => u.Projects)
                   .HasForeignKey(e => e.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
+
             entity.HasQueryFilter(e => e.UserId == CurrentUserId);
         });
 
@@ -44,6 +52,7 @@ public class TimoDbContext(
             entity.HasKey(e => e.Id);
             entity.Property(e => e.TokenHash).IsRequired().HasMaxLength(64);
             entity.HasIndex(e => e.TokenHash).IsUnique();
+
             entity.HasOne(e => e.User)
                   .WithMany()
                   .HasForeignKey(e => e.UserId)
@@ -52,9 +61,14 @@ public class TimoDbContext(
 
         builder.Entity<TimeEntry>(entity =>
         {
-            entity.ToTable("TimeEntries");
+            entity.ToTable("TimeEntries", t =>
+            {
+                t.HasCheckConstraint("CK_TimeEntries_Duration", "[Duration] > '00:00:00'");
+            });
+
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Description).HasMaxLength(500);
+            entity.HasIndex(e => new { e.UserId, e.Date, e.ProjectId });
 
             entity.HasOne(e => e.Project)
                   .WithMany(p => p.TimeEntries)
@@ -65,6 +79,7 @@ public class TimoDbContext(
                   .WithMany(u => u.TimeEntries)
                   .HasForeignKey(e => e.UserId)
                   .OnDelete(DeleteBehavior.NoAction);
+
             entity.HasQueryFilter(e => e.UserId == CurrentUserId);
         });
     }
