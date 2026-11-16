@@ -19,7 +19,17 @@ namespace Timo.WebApi
                 ?? !builder.Environment.IsDevelopment();
 
             builder.Services.AddDbContext<TimoDbContext>(options =>
-                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+                options.UseSqlServer(
+                    builder.Configuration.GetConnectionString("DefaultConnection"),
+                    sqlOptions =>
+                    {
+                        sqlOptions.EnableRetryOnFailure(
+                            maxRetryCount: 6,
+                            maxRetryDelay: TimeSpan.FromSeconds(15),
+                            errorNumbersToAdd: null);
+                        sqlOptions.CommandTimeout(60);
+                    }));
+
             builder.Services.Configure<ApiBehaviorOptions>(options =>
             {
                 options.InvalidModelStateResponseFactory = _ => new BadRequestObjectResult(new ProblemDetails
@@ -84,8 +94,17 @@ namespace Timo.WebApi
             if (builder.Configuration.GetValue<bool>("Database:ApplyMigrations"))
             {
                 await using var scope = app.Services.CreateAsyncScope();
-                var dbContext = scope.ServiceProvider.GetRequiredService<TimoDbContext>();
-                await dbContext.Database.MigrateAsync();
+                var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+                try
+                {
+                    var dbContext = scope.ServiceProvider.GetRequiredService<TimoDbContext>();
+                    await dbContext.Database.MigrateAsync();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Database migration failed during startup.");
+                    throw;
+                }
             }
 
             if (app.Environment.IsDevelopment())
